@@ -439,4 +439,28 @@ class Tests_General_GetCalendar extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $queries_post, 'Post calendar should require queries after flush.' );
 		$this->assertGreaterThan( 0, $queries_page, 'Page calendar should require queries after flush.' );
 	}
+
+	/**
+	 * A pre-deletion callback must not leave the deleted post in the calendar.
+	 *
+	 * @ticket 61343
+	 */
+	public function test_calendar_rendered_before_post_deletion_is_invalidated() {
+		$post_id         = self::factory()->post->create(
+			array( 'post_date' => '2025-02-12 12:00:00' )
+		);
+		$render_calendar = static function () {
+			get_calendar( array( 'display' => false ) );
+		};
+
+		add_action( 'before_delete_post', $render_calendar, 20 );
+		wp_delete_post( $post_id, true );
+		remove_action( 'before_delete_post', $render_calendar, 20 );
+
+		$this->assertStringNotContainsString(
+			'Posts published on February 12, 2025',
+			get_calendar( array( 'display' => false ) ),
+			'The calendar must not retain a day link for a deleted post.'
+		);
+	}
 }
